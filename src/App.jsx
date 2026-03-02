@@ -14,6 +14,12 @@ export default function App() {
   const [playlistTracks, setPlaylistTracks] = useState([
     { id: 4, name: "Strawberry Moon", artist: "IU", album: "Strawberry Moon", uri: "spotify:track:444" },
   ]);
+  
+  const [ searchTerm, setSearchTerm] = useState("");
+
+  function handleSearch(term) {
+    console.log("Searching for:", term);
+  }
 
   function addTrack(track) {
     const alreadyAdded = playlistTracks.some((t) => t.id === track.id);
@@ -45,7 +51,11 @@ export default function App() {
         Ja<span className="highlight">mmm</span>ing
       </h1>
 
-      <SearchBar />
+      <SearchBar 
+        term={searchTerm}
+        onTermChange={setSearchTerm}
+        onSearch={handleSearch}
+      />
 
       <div className="App-playlist">
         <SearchResults tracks={searchResults} onAdd={addTrack} />
