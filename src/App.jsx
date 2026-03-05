@@ -1,25 +1,22 @@
-import { useState } from "react";
-import SearchBar from "./components/SearchBar";
-import SearchResults from "./components/SearchResults";
-import Playlist from "./components/Playlist";
+import { useEffect, useState } from "react";
+import SearchBar from "./Components/SearchBar.jsx";
+import SearchResults from "./Components/SearchResults.jsx";
+import Playlist from "./Components/Playlist.jsx";
+import { Spotify } from "./util/Spotify.js";
 
 export default function App() {
-  const [searchResults] = useState([
-    { id: 1, name: "Good Day", artist: "IU", album: "Real", uri: "spotify:track:111" },
-    { id: 2, name: "LILAC", artist: "IU", album: "LILAC", uri: "spotify:track:222" },
-    { id: 3, name: "Palette", artist: "IU", album: "Palette", uri: "spotify:track:333" },
-  ]);
-
+  const [searchResults, setSearchResults] = useState([]);
   const [playlistName, setPlaylistName] = useState("New Playlist");
-  const [playlistTracks, setPlaylistTracks] = useState([
-    { id: 4, name: "Strawberry Moon", artist: "IU", album: "Strawberry Moon", uri: "spotify:track:444" },
-  ]);
-  
+  const [playlistTracks, setPlaylistTracks] = useState([]);
   const [ searchTerm, setSearchTerm] = useState("");
+  
+  const [isSpotifyConnected, setIsSpotifyConnected] = useState(Spotify.isLoggedIn());
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
 
-  function handleSearch(term) {
-    console.log("Searching for:", term);
-  }
+  useEffect(() => {
+    setIsSpotifyConnected(Spotify.isLoggedIn());
+  }, []);
 
   function addTrack(track) {
     const alreadyAdded = playlistTracks.some((t) => t.id === track.id);
@@ -31,18 +28,35 @@ export default function App() {
     setPlaylistTracks((prev) => prev.filter((t) => t.id !== track.id));
   }
 
-  function updatePlaylistName(name) {
-    setPlaylistName(name);
+  async function handleSearch(term) {
+    try {
+      setSearchError("");
+      setIsSearching(true);
+
+      const results = await Spotify.search(term);
+      setSearchResults(results);
+    } catch (e) {
+      console.error(e);
+      setSearchError("Search failed. Check console and make sure you're connected.");
+    } finally {
+      setIsSearching(false);
+    }
   }
 
-  function savePlaylist() {
-    const trackUris = playlistTracks.map((t) => t.uri);
+  async function savePlaylist() {
+    try {
+      const trackUris = playlistTracks.map((t) => t.uri);
+      const result = await Spotify.savePlaylist(playlistName, trackUris);
 
-    console.log("Saving playlist:", playlistName);
-    console.log("Track URIs", trackUris);
+      console.log("✅ Saved playlist:", result);
 
-    setPlaylistName("New Playlist");
-    setPlaylistTracks([]);
+      setPlaylistName("New Playlist");
+      setPlaylistTracks([]);
+      alert("Playlist saved to Spotify!");
+    } catch (e) {
+      console.error(e);
+      alert("Failed to save playlist. Check console.");
+    }
   }
 
   return (
@@ -50,6 +64,35 @@ export default function App() {
       <h1>
         Ja<span className="highlight">mmm</span>ing
       </h1>
+      
+      <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center" }}>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const token = await Spotify.getAccessToken();
+              if (token) setIsSpotifyConnected(true);
+            } catch (e) {
+              console.error(e);
+              alert("Spotify connect failed. Check console.");
+            }
+          }}
+        >
+          {isSpotifyConnected ? "SPOTIFY CONNECTED ✅" : "CONNECT SPOTIFY"}
+        </button>
+
+        {isSpotifyConnected && (
+          <button
+            type="button"
+            onClick={() => {
+              Spotify.logout();
+              setIsSpotifyConnected(false);
+            }}
+          >
+            DISCONNECT
+          </button>
+        )}
+      </div>
 
       <SearchBar 
         term={searchTerm}
@@ -57,9 +100,22 @@ export default function App() {
         onSearch={handleSearch}
       />
 
+      {isSearching && (
+        <p style={{ textAlign: "center" }}>Searching...</p>
+      )}
+
+      {searchError && (
+        <p style={{ textAlign: "center" }}>{searchError}</p>
+      )}
+
       <div className="App-playlist">
         <SearchResults tracks={searchResults} onAdd={addTrack} />
-        <Playlist name={playlistName} tracks={playlistTracks} onRemove={removeTrack} onNameChange={updatePlaylistName} onSave={savePlaylist} />
+        <Playlist 
+          name={playlistName} 
+          tracks={playlistTracks} 
+          onRemove={removeTrack} 
+          onNameChange={setPlaylistName} 
+          onSave={savePlaylist} />
       </div>
     </div>
   );
